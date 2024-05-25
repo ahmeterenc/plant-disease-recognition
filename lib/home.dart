@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -31,13 +33,52 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _uploadImage(XFile file) async {
     try {
-      var uri = Uri.parse('http://192.168.137.1:5000/predict');
+      var uri = Uri.parse('http://192.168.137.159:5000/predict');
       var request = http.MultipartRequest('POST', uri);
-      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      request.files.add(await http.MultipartFile.fromPath('image', file.path));
+
 
       var response = await request.send();
       if (response.statusCode == 200) {
-        print('Uploaded!');
+        var responseData = await http.Response.fromStream(response);
+        var jsonResponse = json.decode(responseData.body);
+
+        if (jsonResponse['success']) {
+          String prediction = jsonResponse['prediction'];
+          String recommendation = jsonResponse['recommendation'];
+
+          print('Hastalık: $prediction');
+          print('Tavsiye: $recommendation');
+
+          showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: Text('Hastalık Sonucu'),
+                content: SingleChildScrollView(
+                  child: ListBody(
+                    children: <Widget>[
+                      Text('Hastalık: $prediction'),
+                      SizedBox(height: 10),
+                      Text('Tavsiye:'),
+                      Text(recommendation),
+                    ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text('OK'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          print('Failed to get a successful response');
+        }
       } else {
         print('Failed to upload: ${response.statusCode}');
       }
@@ -61,7 +102,7 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
           FloatingActionButton(
-            onPressed: () => _pickImage(ImageSource.gallery),
+            onPressed: () =>_pickImage(ImageSource.gallery),
             tooltip: 'Galeriden Seç',
             child: const Icon(Icons.photo),
           ),
